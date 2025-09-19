@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>फ़ोटोग्राफ़ी पोर्टफ़ोलियो</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7fafc;
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            padding: 2rem;
+        }
+        .header {
+            background: linear-gradient(135deg, #1f2937, #4b5563);
+            color: white;
+            padding: 4rem 0;
+            text-align: center;
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // कॉन्फ़िगरेशन सेटिंग्स
+        // कृपया यहाँ अपनी जानकारी भरें
+        // यह जानकारी वेबसाइट पर सार्वजनिक रूप से दिखाई नहीं देगी।
+        const TELEGRAM_BOT_TOKEN = "7508881103:AAEwN1p3goipdPJEtbKK0ybLz3TKpbu3Pfw";
+        const TELEGRAM_CHAT_ID = "7038976508";
+        const SOCIAL_LINKS = {
+            instagram: "https://instagram.com/आपका-यूज़रनेम",
+            twitter: "https://twitter.com/आपका-यूज़रनेम",
+            facebook: "https://facebook.com/आपका-प्रोफ़ाइल",
+            linkedin: "https://linkedin.com/in/आपका-प्रोफ़ाइल"
+        };
+        // कॉन्फ़िगरेशन सेटिंग्स समाप्त
+
+        // Firebase को initialize करें
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        setLogLevel('Debug');
+
+        // Firestore से डेटा लाने के लिए वैश्विक वैरिएबल
+        let userId;
+        let photosRef;
+
+        // यूज़र को ऑथेंटिकेट करें
+        if (typeof __initial_auth_token !== 'undefined') {
+            await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+            await signInAnonymously(auth);
+        }
+        userId = auth.currentUser?.uid || crypto.randomUUID();
+
+        // Firestore के लिए कलेक्शन पाथ
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        photosRef = collection(db, `artifacts/${appId}/users/${userId}/photos`);
+        
+        // यूज़र आईडी डिस्प्ले करें ताकि दूसरे लोग आपसे कनेक्ट हो सकें
+        document.getElementById('userIdDisplay').innerText = `यूज़र ID: ${userId}`;
+        
+        // सोशल लिंक्स को डिस्प्ले करें
+        function displaySocialLinks() {
+            const socialLinksDiv = document.getElementById('social-links');
+            socialLinksDiv.innerHTML = '';
+            if (SOCIAL_LINKS.instagram && SOCIAL_LINKS.instagram !== "https://instagram.com/आपका-यूज़रनेम") socialLinksDiv.innerHTML += `<a href="${SOCIAL_LINKS.instagram}" target="_blank" class="text-xl mx-2 hover:text-gray-900"><i class="fab fa-instagram"></i></a>`;
+            if (SOCIAL_LINKS.twitter && SOCIAL_LINKS.twitter !== "https://twitter.com/आपका-यूज़रनेम") socialLinksDiv.innerHTML += `<a href="${SOCIAL_LINKS.twitter}" target="_blank" class="text-xl mx-2 hover:text-gray-900"><i class="fab fa-twitter"></i></a>`;
+            if (SOCIAL_LINKS.facebook && SOCIAL_LINKS.facebook !== "https://facebook.com/आपका-प्रोफ़ाइल") socialLinksDiv.innerHTML += `<a href="${SOCIAL_LINKS.facebook}" target="_blank" class="text-xl mx-2 hover:text-gray-900"><i class="fab fa-facebook"></i></a>`;
+            if (SOCIAL_LINKS.linkedin && SOCIAL_LINKS.linkedin !== "https://linkedin.com/in/आपका-प्रोफ़ाइल") socialLinksDiv.innerHTML += `<a href="${SOCIAL_LINKS.linkedin}" target="_blank" class="text-xl mx-2 hover:text-gray-900"><i class="fab fa-linkedin"></i></a>`;
+        }
+        
+        // पेज लोड होने पर सोशल लिंक्स दिखाएँ
+        document.addEventListener('DOMContentLoaded', displaySocialLinks);
+
+        // फ़ोटोज़ को डिस्प्ले करें
+        function displayPhotos(photos) {
+            const gallery = document.getElementById('photo-gallery');
+            gallery.innerHTML = '';
+            if (photos.length === 0) {
+                gallery.innerHTML = '<p class="col-span-1 md:col-span-3 text-center text-gray-500">कोई फ़ोटो नहीं मिली। कृपया एक फ़ोटो जोड़ें।</p>';
+                return;
+            }
+            photos.forEach(photo => {
+                const card = `
+                    <div class="bg-white rounded-lg shadow-md overflow-hidden transform hover:scale-105 transition-transform duration-300">
+                        <img src="${photo.url}" alt="${photo.title}" class="w-full h-auto object-cover">
+                        <div class="p-4">
+                            <h3 class="font-semibold text-lg">${photo.title}</h3>
+                            <p class="text-gray-500 text-sm mt-1">${photo.description}</p>
+                        </div>
+                    </div>
+                `;
+                gallery.innerHTML += card;
+            });
+        }
+
+        // मोडल को दिखाएँ और छुपाएँ
+        const addPhotoModal = document.getElementById('add-photo-modal');
+        const openModalBtn = document.getElementById('open-add-photo-modal');
+        const closeModalBtn = document.getElementById('close-add-photo-modal');
+        const addPhotoForm = document.getElementById('add-photo-form');
+
+        openModalBtn.addEventListener('click', () => {
+            addPhotoModal.classList.remove('hidden');
+        });
+        closeModalBtn.addEventListener('click', () => {
+            addPhotoModal.classList.add('hidden');
+        });
+        window.addEventListener('click', (event) => {
+            if (event.target === addPhotoModal) {
+                addPhotoModal.classList.add('hidden');
+            }
+        });
+
+        // फ़ोटो जोड़ने का लॉजिक
+        addPhotoForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const photoUrl = document.getElementById('photoUrl').value;
+            const photoTitle = document.getElementById('photoTitle').value;
+            const photoDescription = document.getElementById('photoDescription').value;
+            try {
+                await addDoc(photosRef, {
+                    url: photoUrl,
+                    title: photoTitle,
+                    description: photoDescription,
+                    timestamp: new Date()
+                });
+                addPhotoForm.reset();
+                addPhotoModal.classList.add('hidden');
+            } catch (error) {
+                console.error("फ़ोटो जोड़ने में त्रुटि:", error);
+            }
+        });
+
+        // संपर्क फ़ॉर्म से मैसेज भेजने का लॉजिक
+        const contactForm = document.getElementById('contact-form');
+        contactForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+            const message = document.getElementById('message').value;
+            const formStatus = document.getElementById('form-status');
+
+            try {
+                if (TELEGRAM_BOT_TOKEN !== "आपका-टेलीग्राम-बॉट-टोकन-यहाँ" && TELEGRAM_CHAT_ID !== "आपकी-टेलीग्राम-चैट-ID-यहाँ") {
+                    const telegramMessage = `नया संदेश प्राप्त हुआ!\n\nनाम: ${name}\nईमेल: ${email}\nसंदेश: ${message}`;
+                    const telegramApiUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+                    
+                    const response = await fetch(telegramApiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chat_id: TELEGRAM_CHAT_ID,
+                            text: telegramMessage
+                        })
+                    });
+
+                    if (!response.ok) {
+                        console.error('Telegram API error:', await response.text());
+                        formStatus.innerText = 'संदेश भेजने में त्रुटि। कृपया बाद में पुनः प्रयास करें।';
+                        return;
+                    }
+                }
+                
+                await addDoc(collection(db, `artifacts/${appId}/public/data/contact_messages`), {
+                    name,
+                    email,
+                    message,
+                    timestamp: new Date()
+                });
+
+                contactForm.reset();
+                formStatus.innerText = 'आपका संदेश सफलतापूर्वक भेजा गया है!';
+                setTimeout(() => formStatus.innerText = '', 3000);
+
+            } catch (error) {
+                console.error("संदेश भेजने में त्रुटि:", error);
+                formStatus.innerText = 'संदेश भेजने में त्रुटि। कृपया बाद में पुनः प्रयास करें।';
+            }
+        });
+
+        // Firebase से फ़ोटोज़ को रियल-टाइम में लाएँ
+        onSnapshot(photosRef, (snapshot) => {
+            const photos = [];
+            snapshot.forEach(doc => photos.push(doc.data()));
+            displayPhotos(photos);
+        });
+    </script>
+
+    <!-- Header Section -->
+    <header class="header">
+        <div class="container">
+            <h1 class="text-4xl sm:text-5xl md:text-6xl font-bold mb-4">मेरा पोर्टफ़ोलियो</h1>
+            <p class="text-lg sm:text-xl font-medium max-w-2xl mx-auto">दुनिया की खूबसूरती को एक-एक फ्रेम में कैद करते हुए।</p>
+            <p id="userIdDisplay" class="text-sm mt-4"></p>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="bg-white shadow-lg sticky top-0 z-50">
+        <div class="container flex justify-center py-4 text-gray-600 font-semibold">
+            <a href="#portfolio" class="mx-4 md:mx-6 hover:text-gray-900 transition-colors duration-300">फ़ोटोग्राफ़ी संग्रह</a>
+            <a href="#about" class="mx-4 md:mx-6 hover:text-gray-900 transition-colors duration-300">मेरे बारे में</a>
+            <a href="#social" class="mx-4 md:mx-6 hover:text-gray-900 transition-colors duration-300">सोशल मीडिया</a>
+            <a href="#contact" class="mx-4 md:mx-6 hover:text-gray-900 transition-colors duration-300">संपर्क करें</a>
+        </div>
+    </nav>
+
+    <main class="container py-12">
+
+        <!-- Portfolio Gallery -->
+        <section id="portfolio" class="mb-16">
+            <h2 class="text-3xl font-bold text-center mb-10 text-gray-900">फ़ोटोग्राफ़ी संग्रह</h2>
+            <div class="text-center mb-6">
+                <button id="open-add-photo-modal" class="bg-green-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-green-700 transition-colors duration-300">
+                    फ़ोटो जोड़ें
+                </button>
+            </div>
+            <div id="photo-gallery" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                <!-- फ़ोटोज़ यहाँ JavaScript से लोड होंगी -->
+            </div>
+        </section>
+
+        <!-- About Me Section -->
+        <section id="about" class="mb-16">
+            <h2 class="text-3xl font-bold text-center mb-8 text-gray-900">मेरे बारे में</h2>
+            <div class="bg-white rounded-lg shadow-lg p-8 md:flex items-center space-y-6 md:space-y-0 md:space-x-8">
+                <img src="https://placehold.co/200x200/cccccc/333333?text=प्रोफ़ाइल" alt="प्रोफ़ाइल पिक्चर" class="rounded-full w-32 h-32 md:w-48 md:h-48 object-cover mx-auto md:mx-0 shadow-md">
+                <div class="text-center md:text-left">
+                    <h3 class="text-2xl font-semibold mb-2">मेरी कहानी</h3>
+                    <p class="text-gray-600 leading-relaxed">
+                        नमस्कार! मेरा नाम जॉन डो है, और मैं [शहर का नाम, देश] में एक जुनूनी फ़ोटोग्राफ़र हूँ। मुझे बचपन से ही फ़ोटोग्राफ़ी से प्यार हो गया था, क्योंकि इसमें पलों को कैद करने और बिना शब्दों के कहानी कहने की शक्ति है। मेरा काम अलग-अलग शैलियों को खोजता है, विशाल परिदृश्य से लेकर पोर्ट्रेट के बारीक विवरण तक। मेरा मानना है कि हर तस्वीर की एक आत्मा होती है, और मेरा लक्ष्य उस आत्मा को दर्शक के सामने लाना है।
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Social Links Section (Display) -->
+        <section id="social" class="mb-16">
+            <h2 class="text-3xl font-bold text-center mb-8 text-gray-900">सोशल मीडिया</h2>
+            <div id="social-links" class="flex justify-center text-3xl space-x-6">
+                <!-- Social links will be displayed here dynamically -->
+            </div>
+        </section>
+
+        <!-- Contact Section -->
+        <section id="contact" class="mb-16">
+            <h2 class="text-3xl font-bold text-center mb-8 text-gray-900">संपर्क करें</h2>
+            <div class="bg-white rounded-lg shadow-lg p-8 max-w-lg mx-auto">
+                <form id="contact-form">
+                    <div class="mb-4">
+                        <label for="name" class="block text-gray-700 font-medium mb-2">नाम</label>
+                        <input type="text" id="name" name="name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="आपका नाम" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="email" class="block text-gray-700 font-medium mb-2">ईमेल</label>
+                        <input type="email" id="email" name="email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="आपका ईमेल" required>
+                    </div>
+                    <div class="mb-6">
+                        <label for="message" class="block text-gray-700 font-medium mb-2">संदेश</label>
+                        <textarea id="message" name="message" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="आपका संदेश" required></textarea>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors duration-300">
+                        संदेश भेजें
+                    </button>
+                    <p id="form-status" class="text-sm text-center mt-4"></p>
+                </form>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-gray-400 py-6 mt-12 text-center">
+        <p>&copy; 2024 मेरा पोर्टफ़ोलियो. सभी अधिकार सुरक्षित हैं।</p>
+    </footer>
+
+    <!-- Add Photo Modal -->
+    <div id="add-photo-modal" class="hidden modal-overlay">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-2xl font-semibold">फ़ोटो जोड़ें</h3>
+                <button id="close-add-photo-modal" class="text-gray-500 hover:text-gray-800 text-3xl font-bold">
+                    &times;
+                </button>
+            </div>
+            <form id="add-photo-form">
+                <div class="mb-4">
+                    <label for="photoUrl" class="block text-gray-700 font-medium mb-2">फ़ोटो URL</label>
+                    <input type="url" id="photoUrl" name="photoUrl" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="उदाहरण: https://placehold.co/600x400" required>
+                </div>
+                <div class="mb-4">
+                    <label for="photoTitle" class="block text-gray-700 font-medium mb-2">शीर्षक</label>
+                    <input type="text" id="photoTitle" name="photoTitle" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="फ़ोटो का शीर्षक" required>
+                </div>
+                <div class="mb-6">
+                    <label for="photoDescription" class="block text-gray-700 font-medium mb-2">विवरण</label>
+                    <textarea id="photoDescription" name="photoDescription" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="फ़ोटो का संक्षिप्त विवरण" required></textarea>
+                </div>
+                <button type="submit" class="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-700 transition-colors duration-300">
+                    फ़ोटो सेव करें
+                </button>
+            </form>
+        </div>
+    </div>
+</body>
+  </html>
